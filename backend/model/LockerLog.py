@@ -10,25 +10,25 @@ class LockerLog(Base):
     __tablename__ = "locker_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    locker_id = Column(Integer, ForeignKey("lockers.id"))
+    locker_id = Column(String)  # stores Locker.combi_id
     user_id = Column(Integer, ForeignKey("standard_users.id"))
     action = Column(String)  # "Låst opp", "Låst" eller "Automatisk frigjort"
     timestamp = Column(DateTime, default=dt.now(UTC))
 
-async def log_action(locker_id: int, user_id: int | None, action: str, db: Session):
-    log = LockerLog(locker_id=locker_id, user_id=user_id, action=action, timestamp=dt.now(UTC))
+async def log_action(locker_id: str, user_id: int | None, action: str, db: Session):
+    log = LockerLog(locker_id=str(locker_id), user_id=user_id, action=action, timestamp=dt.now(UTC))
     db.add(log)
     db.commit()
     db.refresh(log)
     await broadcast_message("update")
     return log  # vurder dette, som i de andre funksjonene
 
-async def log_unlock_action(locker_id: int, user_id: int, db: Session):
+async def log_unlock_action(locker_id: str, user_id: int, db: Session):
     """
     Logger en Låst opp-hendelse.
     """
     new_log = LockerLog(
-        locker_id=locker_id,
+        locker_id=str(locker_id),
         user_id=user_id,
         action="Låst opp",
         timestamp=dt.now(UTC)
@@ -40,12 +40,12 @@ async def log_unlock_action(locker_id: int, user_id: int, db: Session):
     return new_log
 
 
-async def log_lock_action(locker_id: int, user_id: int, db: Session):
+async def log_lock_action(locker_id: str, user_id: int, db: Session):
     """
     Logger en Låst-hendelse.
     """
     new_log = LockerLog(
-        locker_id=locker_id,
+        locker_id=str(locker_id),
         user_id=user_id,
         action="Låst",
         timestamp=dt.now(UTC)
@@ -57,12 +57,12 @@ async def log_lock_action(locker_id: int, user_id: int, db: Session):
     return new_log
 
 
-async def log_reserved_action(locker_id: int, user_id: int, db: Session):
+async def log_reserved_action(locker_id: str, user_id: int, db: Session):
     """
     Logger en reserverings-hendelse.
     """
     new_log = LockerLog(
-        locker_id=locker_id,
+        locker_id=str(locker_id),
         user_id=user_id,
         action="Reservert",
         timestamp=dt.now(UTC)
@@ -86,7 +86,7 @@ async def release_expired_lockers_logic(db: Session) -> list[str]:
 
     for locker in occupied_lockers:
         last_reservation = db.query(LockerLog).filter(
-            LockerLog.locker_id == locker.id,
+            LockerLog.locker_id == locker.combi_id,
             LockerLog.action == "Reservert"
         ).order_by(LockerLog.timestamp.desc()).first()
 
@@ -105,7 +105,7 @@ async def release_expired_lockers_logic(db: Session) -> list[str]:
             db.refresh(locker)
 
             new_log = LockerLog(
-                locker_id=locker.id,
+                locker_id=locker.combi_id,
                 user_id=None,
                 action="Automatisk frigjort",
                 timestamp=dt.now(UTC).replace(microsecond=0)
