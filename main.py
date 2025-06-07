@@ -394,7 +394,7 @@ async def unlock_locker_endpoint(locker_id: int, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(locker)  # Sikrer at endringer reflekteres i objektet
 
-        await log_unlock_action(locker_id=locker.id, user_id=locker.user_id, db=db)
+        await log_unlock_action(locker_id=locker.combi_id, user_id=locker.user_id, db=db)
 
         return locker
     except Exception as e:
